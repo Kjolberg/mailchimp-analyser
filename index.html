@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mailchimp Dyp-Analyse — Royal Solskjerming</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    :root {
+      /* BEACON Light Mode */
+      --bg: #FFFFFF;
+      --card: #F8F7F3;
+      --border: #E0D8CC;
+      --text: #223142;
+      --muted: #666666;
+      --dim: #999999;
+      --skin: #E8D4B8;
+      --skin-light: #F3EAE0;
+      /* B&C Brand */
+      --bc-blue: #2078A0;
+      --bc-green: #5FA643;
+      --bc-yellow: #C49A20;
+      --bc-ocre: #E8593C;
+      --bc-purple: #B04890;
+      --bc-teal: #3BB89A;
+      --bc-red: #D04030;
+      --bc-primary: #223142;
+      --bc-primary-light: #4A5A6D;
+      /* Spacing */
+      --sp-4: 4px; --sp-8: 8px; --sp-12: 12px; --sp-16: 16px; --sp-24: 24px; --sp-32: 32px;
+      --radius-sm: 4px; --radius-md: 8px; --radius-lg: 12px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+
+    .header { background: var(--bc-primary); border-bottom: 1px solid var(--border); padding: var(--sp-24) var(--sp-32); display: flex; justify-content: space-between; align-items: center; }
+    .header h1 { font-size: 22px; font-weight: 500; color: #fff; }
+    .header h1 span { color: var(--skin); }
+    .header .sub { color: #B8B6AC; font-size: 13px; margin-top: 2px; }
+    .top-right { display: flex; align-items: center; gap: var(--sp-12); }
+    .health-pill { padding: 6px 14px; border-radius: 14px; font-size: 13px; font-weight: 500; }
+    .health-good { background: #e8f5e2; color: #3a7a24; }
+    .health-ok { background: #fdf3d7; color: #8a6d10; }
+    .health-bad { background: #fde8e5; color: #a83020; }
+    .sync-btn { background: var(--skin); color: var(--bc-primary); border: 1px solid var(--skin); padding: var(--sp-12) var(--sp-16); border-radius: var(--radius-md); cursor: pointer; font-size: 13px; font-weight: 500; font-family: inherit; transition: all .2s; }
+    .sync-btn:hover { background: #d4bfa0; transform: translateY(-1px); }
+    .sync-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+    .container { max-width: 1440px; margin: 0 auto; padding: var(--sp-24) var(--sp-32); }
+    .tabs { display: flex; gap: var(--sp-8); margin-bottom: var(--sp-24); flex-wrap: wrap; }
+    .tab { padding: var(--sp-8) var(--sp-16); border-radius: var(--radius-md); border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; font-size: 13px; font-family: inherit; transition: all .2s; }
+    .tab.active { background: var(--bc-primary); border-color: var(--bc-primary); color: #fff; }
+    .tab:hover:not(.active) { border-color: var(--bc-primary-light); color: var(--text); }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-24); margin-bottom: var(--sp-24); }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--sp-24); margin-bottom: var(--sp-24); }
+    .grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--sp-12); margin-bottom: var(--sp-24); }
+
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--sp-24); }
+    .card h3 { font-size: 14px; font-weight: 500; margin-bottom: var(--sp-16); color: var(--text); }
+    .card .hint { font-size: 12px; color: var(--dim); margin-top: var(--sp-12); line-height: 1.6; }
+
+    .stat { text-align: center; }
+    .stat .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: var(--sp-8); }
+    .stat .val { font-size: 28px; font-weight: 500; }
+    .stat .val.blue { color: var(--bc-blue); }
+    .stat .val.green { color: var(--bc-green); }
+    .stat .val.yellow { color: var(--bc-yellow); }
+    .stat .val.ocre { color: var(--bc-ocre); }
+    .stat .val.purple { color: var(--bc-purple); }
+    .stat .val.teal { color: var(--bc-teal); }
+    .stat .val.red { color: var(--bc-red); }
+
+    .seg-bar { display: flex; height: 32px; border-radius: var(--radius-md); overflow: hidden; margin-bottom: var(--sp-12); }
+    .seg-bar div { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: #fff; min-width: 40px; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; padding: var(--sp-8) 10px; font-size: 11px; text-transform: uppercase; letter-spacing: .4px; color: var(--dim); border-bottom: 1px solid var(--border); }
+    td { padding: 7px 10px; border-bottom: 1px solid var(--border); color: var(--muted); }
+    tr:hover td { background: rgba(232,212,184,.15); }
+    .badge { display: inline-block; padding: 2px 7px; border-radius: var(--radius-sm); font-size: 11px; font-weight: 500; }
+    .badge.good { background: #e8f5e2; color: #3a7a24; }
+    .badge.ok { background: #fdf3d7; color: #8a6d10; }
+    .badge.low { background: #fde8e5; color: #a83020; }
+    .badge.seg { padding: 3px 8px; border-radius: 6px; }
+
+    .insight-box { background: var(--skin-light); border: 1px solid var(--skin); border-radius: var(--radius-lg); padding: var(--sp-16); margin-bottom: var(--sp-24); }
+    .insight-box h4 { font-size: 13px; color: var(--bc-primary); margin-bottom: var(--sp-8); font-weight: 500; }
+    .insight-box p { font-size: 13px; color: var(--bc-primary-light); line-height: 1.6; }
+
+    .loading { text-align: center; padding: 60px; color: var(--dim); }
+    .scrollable { max-height: 400px; overflow-y: auto; }
+
+    .lang-toggle { display: flex; border: 1px solid rgba(255,255,255,.25); border-radius: var(--radius-md); overflow: hidden; }
+    .lang-btn { padding: 6px 12px; font-size: 12px; font-weight: 500; background: transparent; border: none; color: rgba(255,255,255,.6); cursor: pointer; font-family: inherit; transition: all .2s; }
+    .lang-btn.active { background: var(--skin); color: var(--bc-primary); }
+    .lang-btn:hover:not(.active) { color: #fff; }
+
+    @media (max-width: 900px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } .grid-5 { grid-template-columns: repeat(3, 1fr); } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h1><span>Mailchimp</span> Dyp-Analyse</h1>
+      <div class="sub">Royal Solskjerming AS</div>
+    </div>
+    <div class="top-right">
+      <div class="lang-toggle">
+        <button class="lang-btn active" onclick="setLang('no')">NO</button>
+        <button class="lang-btn" onclick="setLang('en')">EN</button>
+      </div>
+      <span id="healthPill" class="health-pill health-good">—</span>
+      <button class="sync-btn" onclick="syncData()">↻ Synkroniser</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="tabs">
+      <button class="tab active" data-tab="helse">Helsescore</button>
+      <button class="tab" data-tab="segmenter">Segmenter</button>
+      <button class="tab" data-tab="superfans">Superfans</button>
+      <button class="tab" data-tab="ghosts">Ghosts & Opprydding</button>
+      <button class="tab" data-tab="domener">Domene-analyse</button>
+      <button class="tab" data-tab="trend">Kampanje-trend</button>
+      <button class="tab" data-tab="bestworst">Beste & Verste</button>
+      <button class="tab" data-tab="tags">Tag-analyse</button>
+    </div>
+    <div id="content"><div class="loading">Henter analyse...</div></div>
+  </div>
+
+<script>
+const SB_URL = 'https://kypibmznpxqhcnxflcdz.supabase.co';
+const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt5cGlibXpucHhxaGNueGZsY2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMDEzODcsImV4cCI6MjA5MTc3NzM4N30.8cJ8OZhfig8WvivK6Wq4_pj6ShR1v8VKP8SetjsfR8E';
+let D = null;
+let charts = [];
+let lang = 'no';
+
+// i18n
+const i18n = {
+  no: {
+    title: 'Dyp-Analyse', sub: 'Royal Solskjerming AS',
+    sync: '↻ Synkroniser', syncing: '↻ Synkroniserer...', syncDone: '✓ Ferdig!', syncFail: '✗ Feil',
+    health: 'Listehelse', loading: 'Henter analyse...',
+    tabs: { helse: 'Helsescore', segmenter: 'Segmenter', superfans: 'Superfans', ghosts: 'Ghosts & Opprydding', domener: 'Domene-analyse', trend: 'Kampanje-trend', bestworst: 'Beste & Verste', tags: 'Tag-analyse' },
+    stats: { subscribers: 'Abonnenter', avgOpen: 'Snitt åpning', avgClick: 'Snitt klikk', ghosts: 'Ghosts', domains: 'Unike domener', campaigns: 'Kampanjer', total: 'Totalt', ofList: '% av listen', events30: 'Hendelser (30 dager)' },
+    seg: { superfans: 'Superfans', engasjerte: 'Engasjerte', passive: 'Passive lesere', sovende: 'Nesten sovende', ghosts: 'Ghosts' },
+    segAdvice: { superfans: 'Send eksklusive tilbud, be om referanser', engasjerte: 'Hold engasjementet — varier innhold', passive: 'Test nye emnelinjer, send på andre tidspunkt', sovende: 'Re-engasjementskampanje eller rydd opp', ghosts: 'Vurder å fjerne — skader leveringsrate' },
+    table: { segment: 'Segment', count: 'Antall', pctList: '% av liste', avgOpen: 'Snitt åpning', avgClick: 'Snitt klikk', advice: 'Anbefaling', email: 'E-post', domain: 'Domene', company: 'Firma/domene', opens: 'Åpner', clicks: 'Klikker', rating: 'Rating', tags: 'Tags', subject: 'Emne', from: 'Fra', sent: 'Sendt', sentCount: 'Antall', openRate: 'Åpningsrate', clickRate: 'Klikkrate', unsubs: 'Avmeldinger', quarter: 'Kvartal', avgSent: 'Snitt sendt', date: 'Dato', tag: 'Tag' },
+    charts: { engDist: 'Engasjement-fordeling', segOpen: 'Segmenter: Åpningsrate', segClick: 'Segmenter: Klikkrate', openOverTime: 'Åpning & klikk per kvartal', bigDomains: 'Største domener', tagEng: 'Tags: Engasjement', openRate: 'Åpningsrate %', clickRate: 'Klikkrate %', count: 'Antall' },
+    insights: {
+      healthTitle: '💡 Hva betyr helsescoren?',
+      healthGood: s => `${s}% av listen din er enten Superfans eller Engasjerte — de som faktisk leser nyhetsbrevene. Bransjesnittet ligger rundt 30-40%. Du er over snittet — bra jobba!`,
+      healthBad: s => `${s}% av listen din er enten Superfans eller Engasjerte — de som faktisk leser nyhetsbrevene. Bransjesnittet ligger rundt 30-40%. Du har potensial for forbedring. Se på Ghosts-fanen for opprydding.`,
+      segTitle: '📊 Segmentoversikt', segBody: '<strong>Superfans</strong> åpner 60%+ og klikker 5%+ — dine mest verdifulle kontakter. <strong>Ghosts</strong> åpner under 5% — de drar ned snittet og kan skade leveringsraten.',
+      sfTitle: n => `⭐ Dine ${n} Superfans`, sfBody: 'Disse åpner 60%+ av nyhetsbrevene og klikker aktivt. De er dine beste ambassadører — vurder eksklusive tilbud, tidlig tilgang, eller be dem om en anbefaling.',
+      ghTitle: n => `👻 ${n} Ghosts — aldri åpner`, ghBody: n => `Disse ${n} abonnentene åpner under 5% av e-postene. De koster penger og drar ned leveringsraten. <strong>Anbefaling:</strong> Send én siste re-engasjements-e-post, og fjern de som ikke reagerer.`,
+      ghListTitle: 'Ghost-liste — vurder opprydding',
+      domTitle: '🏢 Domene-innsikt', domBody: 'Se hvilke firmaer/domener som er mest engasjerte, og hvilke som er døde. Store domener med lav åpningsrate er kandidater for opprydding eller personlig oppfølging.',
+      domBest: '🏆 Mest engasjerte domener', domDead: '💀 Døde domener (åpner under 10%)',
+      trendTitle: '📈 Kampanje-trend over tid', trendBody: 'Ser åpningsraten opp eller ned? Denne grafen viser utviklingen per kvartal.',
+      bestTitle: '🏆 Topp 10 kampanjer (høyest klikk)', worstTitle: '📉 Bunn 10 kampanjer (lavest åpning)',
+      bestHint: '💡 Studer emnelinjene og innholdet i disse — hva hadde de til felles?', worstHint: '💡 Var emnelinjen for kjedelig? Ble den sendt på feil tidspunkt?',
+      tagTitle: '🏷️ Tag-analyse', tagBody: 'Hvilke tags har høyest engasjement? Bruk dette til å forstå hvilke segmenter som er mest aktive.', noTags: 'Ingen tags funnet.',
+    },
+  },
+  en: {
+    title: 'Deep Analysis', sub: 'Royal Solskjerming AS',
+    sync: '↻ Sync', syncing: '↻ Syncing...', syncDone: '✓ Done!', syncFail: '✗ Error',
+    health: 'List Health', loading: 'Loading analysis...',
+    tabs: { helse: 'Health Score', segmenter: 'Segments', superfans: 'Superfans', ghosts: 'Ghosts & Cleanup', domener: 'Domain Analysis', trend: 'Campaign Trend', bestworst: 'Best & Worst', tags: 'Tag Analysis' },
+    stats: { subscribers: 'Subscribers', avgOpen: 'Avg Open', avgClick: 'Avg Click', ghosts: 'Ghosts', domains: 'Unique Domains', campaigns: 'Campaigns', total: 'Total', ofList: '% of list', events30: 'Events (30 days)' },
+    seg: { superfans: 'Superfans', engasjerte: 'Engaged', passive: 'Passive Readers', sovende: 'Nearly Dormant', ghosts: 'Ghosts' },
+    segAdvice: { superfans: 'Send exclusive offers, ask for referrals', engasjerte: 'Keep engagement up — vary content', passive: 'Test new subject lines, send at different times', sovende: 'Re-engagement campaign or clean up', ghosts: 'Consider removing — hurts deliverability' },
+    table: { segment: 'Segment', count: 'Count', pctList: '% of list', avgOpen: 'Avg Open', avgClick: 'Avg Click', advice: 'Recommendation', email: 'Email', domain: 'Domain', company: 'Company/Domain', opens: 'Opens', clicks: 'Clicks', rating: 'Rating', tags: 'Tags', subject: 'Subject', from: 'From', sent: 'Sent', sentCount: 'Count', openRate: 'Open Rate', clickRate: 'Click Rate', unsubs: 'Unsubscribes', quarter: 'Quarter', avgSent: 'Avg Sent', date: 'Date', tag: 'Tag' },
+    charts: { engDist: 'Engagement Distribution', segOpen: 'Segments: Open Rate', segClick: 'Segments: Click Rate', openOverTime: 'Open & click per quarter', bigDomains: 'Largest Domains', tagEng: 'Tags: Engagement', openRate: 'Open Rate %', clickRate: 'Click Rate %', count: 'Count' },
+    insights: {
+      healthTitle: '💡 What does the health score mean?',
+      healthGood: s => `${s}% of your list are either Superfans or Engaged — people who actually read your newsletters. Industry average is around 30-40%. You're above average — great job!`,
+      healthBad: s => `${s}% of your list are either Superfans or Engaged — people who actually read your newsletters. Industry average is around 30-40%. There's room for improvement. Check the Ghosts tab for cleanup.`,
+      segTitle: '📊 Segment Overview', segBody: '<strong>Superfans</strong> open 60%+ and click 5%+ — your most valuable contacts. <strong>Ghosts</strong> open under 5% — they drag down averages and can hurt deliverability.',
+      sfTitle: n => `⭐ Your ${n} Superfans`, sfBody: 'These open 60%+ of your newsletters and click actively. They are your best ambassadors — consider exclusive offers, early access, or ask for a referral.',
+      ghTitle: n => `👻 ${n} Ghosts — never open`, ghBody: n => `These ${n} subscribers open less than 5% of your emails. They cost money and hurt deliverability. <strong>Recommendation:</strong> Send one last re-engagement email, and remove those who don't respond.`,
+      ghListTitle: 'Ghost list — consider cleanup',
+      domTitle: '🏢 Domain Insights', domBody: 'See which companies/domains are most engaged, and which are dead. Large domains with low open rates are candidates for cleanup or personal follow-up.',
+      domBest: '🏆 Most Engaged Domains', domDead: '💀 Dead Domains (open under 10%)',
+      trendTitle: '📈 Campaign Trend Over Time', trendBody: 'Is your open rate going up or down? This chart shows the trend per quarter.',
+      bestTitle: '🏆 Top 10 Campaigns (highest click)', worstTitle: '📉 Bottom 10 Campaigns (lowest open)',
+      bestHint: '💡 Study the subject lines and content here — what did they have in common?', worstHint: '💡 Was the subject line too boring? Was it sent at the wrong time?',
+      tagTitle: '🏷️ Tag Analysis', tagBody: 'Which tags have the highest engagement? Use this to understand which segments are most active.', noTags: 'No tags found.',
+    },
+  },
+};
+
+function tr() { return i18n[lang]; }
+
+// BEACON chart colors (light mode friendly)
+const BC = { blue: '#2078A0', green: '#5FA643', yellow: '#C49A20', ocre: '#E8593C', purple: '#B04890', teal: '#3BB89A', red: '#D04030' };
+const segColors = { superfans: BC.green, engasjerte: BC.blue, passive: BC.yellow, sovende: BC.ocre, ghosts: BC.red };
+
+function segLabel(key) { return tr().seg[key] || key; }
+function segAdvice(key) { return tr().segAdvice[key] || ''; }
+
+function destroy() { charts.forEach(c => c.destroy()); charts = []; }
+
+function setLang(l) {
+  lang = l;
+  document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.textContent === l.toUpperCase()));
+  document.querySelector('.header h1').innerHTML = `<span>Mailchimp</span> ${tr().title}`;
+  document.querySelector('.sync-btn').textContent = tr().sync;
+  document.querySelectorAll('.tab').forEach(tb => { if (tr().tabs[tb.dataset.tab]) tb.textContent = tr().tabs[tb.dataset.tab]; });
+  if (D) { updateHealth(); const activeTab = document.querySelector('.tab.active'); if (activeTab) switchTab(activeTab.dataset.tab); }
+}
+
+async function load() {
+  const res = await fetch(`${SB_URL}/functions/v1/mailchimp-stats?report=deep`, { headers: { Authorization: `Bearer ${KEY}` } });
+  const json = await res.json();
+  D = json.data;
+  updateHealth();
+  switchTab('helse');
+}
+
+function updateHealth() {
+  const pill = document.getElementById('healthPill');
+  const s = D.helse.score;
+  pill.textContent = `${tr().health}: ${s}%`;
+  pill.className = 'health-pill ' + (s >= 40 ? 'health-good' : s >= 25 ? 'health-ok' : 'health-bad');
+}
+
+async function syncData() {
+  const btn = document.querySelector('.sync-btn');
+  btn.disabled = true; btn.textContent = tr().syncing;
+  try {
+    await fetch(`${SB_URL}/functions/v1/mailchimp-sync`, { method: 'POST', headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' } });
+    btn.textContent = tr().syncDone;
+    setTimeout(async () => { btn.textContent = tr().sync; btn.disabled = false; await load(); }, 1500);
+  } catch(e) { btn.textContent = tr().syncFail; setTimeout(() => { btn.textContent = tr().sync; btn.disabled = false; }, 2000); }
+}
+
+function rb(rate) {
+  if (rate >= 30) return `<span class="badge good">${rate}%</span>`;
+  if (rate >= 15) return `<span class="badge ok">${rate}%</span>`;
+  return `<span class="badge low">${rate}%</span>`;
+}
+function fd(d) { return d ? new Date(d).toLocaleDateString(lang === 'no' ? 'nb-NO' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'; }
+
+function chartOpts(extra = {}) {
+  return {
+    responsive: true,
+    plugins: { legend: { labels: { color: '#666666', font: { family: "-apple-system, BlinkMacSystemFont, 'Segoe UI'" } } }, ...extra.plugins },
+    scales: {
+      y: { beginAtZero: true, ticks: { color: '#666666', ...(extra.yTick || {}) }, grid: { color: '#E0D8CC' }, ...(extra.y || {}) },
+      x: { ticks: { color: '#666666', ...(extra.xTick || {}) }, grid: { display: false }, ...(extra.x || {}) },
+      ...(extra.scales || {}),
+    },
+    ...extra.root,
+  };
+}
+
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  destroy();
+  const c = document.getElementById('content');
+  if (!D) { c.innerHTML = `<div class="loading">${tr().loading}</div>`; return; }
+  const r = { helse: renderHelse, segmenter: renderSegmenter, superfans: renderSuperfans, ghosts: renderGhosts, domener: renderDomener, trend: renderTrend, bestworst: renderBestWorst, tags: renderTags };
+  (r[tab] || r.helse)();
+}
+
+function renderHelse() {
+  const h = D.helse; const segs = D.segmenter; const T = tr();
+  document.getElementById('content').innerHTML = `
+    <div class="insight-box">
+      <h4>${T.insights.healthTitle}</h4>
+      <p>${h.score >= 40 ? T.insights.healthGood(h.score) : T.insights.healthBad(h.score)}</p>
+    </div>
+    <div class="grid-5">
+      <div class="card stat"><div class="label">${T.stats.subscribers}</div><div class="val blue">${h.total_abonnenter}</div></div>
+      <div class="card stat"><div class="label">${T.stats.avgOpen}</div><div class="val green">${h.snitt_open}%</div></div>
+      <div class="card stat"><div class="label">${T.stats.avgClick}</div><div class="val yellow">${h.snitt_click}%</div></div>
+      <div class="card stat"><div class="label">${T.stats.ghosts}</div><div class="val red">${h.ghosts_prosent}%</div></div>
+      <div class="card stat"><div class="label">${T.stats.domains}</div><div class="val purple">${h.unike_domener}</div></div>
+    </div>
+    <div class="card">
+      <h3>${T.charts.engDist}</h3>
+      <div class="seg-bar">${segs.map(s => `<div style="width:${s.prosent}%;background:${segColors[s.segment]}" title="${segLabel(s.segment)}: ${s.antall} (${s.prosent}%)">${s.prosent > 8 ? s.prosent + '%' : ''}</div>`).join('')}</div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px">
+        ${segs.map(s => `<div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><span style="width:10px;height:10px;border-radius:3px;background:${segColors[s.segment]};display:inline-block"></span>${segLabel(s.segment)}: <strong style="color:var(--text)">${s.antall}</strong> (${s.prosent}%)</div>`).join('')}
+      </div>
+    </div>
+    <div class="grid-2" style="margin-top:20px">
+      <div class="card"><h3>${T.charts.segOpen}</h3><canvas id="segOpenChart"></canvas></div>
+      <div class="card"><h3>${T.charts.segClick}</h3><canvas id="segClickChart"></canvas></div>
+    </div>`;
+  const labels = segs.map(s => segLabel(s.segment));
+  const colors = segs.map(s => segColors[s.segment]);
+  const o = chartOpts({ yTick: { callback: v => v + '%' } });
+  charts.push(new Chart(document.getElementById('segOpenChart'), { type: 'bar', data: { labels, datasets: [{ data: segs.map(s => s.snitt_open), backgroundColor: colors.map(c => c + '44'), borderColor: colors, borderWidth: 1 }] }, options: { ...o, plugins: { legend: { display: false } } } }));
+  charts.push(new Chart(document.getElementById('segClickChart'), { type: 'bar', data: { labels, datasets: [{ data: segs.map(s => s.snitt_click), backgroundColor: colors.map(c => c + '44'), borderColor: colors, borderWidth: 1 }] }, options: { ...o, plugins: { legend: { display: false } } } }));
+}
+
+function renderSegmenter() {
+  const segs = D.segmenter; const T = tr();
+  document.getElementById('content').innerHTML = `
+    <div class="insight-box">
+      <h4>${T.insights.segTitle}</h4>
+      <p>${T.insights.segBody}</p>
+    </div>
+    <div class="card">
+      <table>
+        <thead><tr><th>${T.table.segment}</th><th>${T.table.count}</th><th>${T.table.pctList}</th><th>${T.table.avgOpen}</th><th>${T.table.avgClick}</th><th>${T.table.advice}</th></tr></thead>
+        <tbody>${segs.map(s => `<tr>
+          <td><span class="badge seg" style="background:${segColors[s.segment]}22;color:${segColors[s.segment]}">${segLabel(s.segment)}</span></td>
+          <td><strong>${s.antall}</strong></td><td>${s.prosent}%</td><td>${rb(s.snitt_open)}</td><td>${rb(s.snitt_click)}</td>
+          <td style="font-size:12px;color:var(--dim)">${segAdvice(s.segment)}</td></tr>`).join('')}</tbody>
+      </table>
+    </div>`;
+}
+
+function renderSuperfans() {
+  const fans = D.superfans; const T = tr();
+  document.getElementById('content').innerHTML = `
+    <div class="insight-box">
+      <h4>${T.insights.sfTitle(fans.length)}</h4>
+      <p>${T.insights.sfBody}</p>
+    </div>
+    <div class="card scrollable">
+      <table>
+        <thead><tr><th>${T.table.email}</th><th>${T.table.company}</th><th>${T.table.opens}</th><th>${T.table.clicks}</th><th>${T.table.rating}</th><th>${T.table.tags}</th></tr></thead>
+        <tbody>${fans.map(f => `<tr>
+          <td style="color:var(--text)">${f.email}</td><td style="color:var(--dim)">${f.domene}</td>
+          <td>${rb(f.open_rate)}</td><td>${rb(f.click_rate)}</td>
+          <td style="color:var(--bc-yellow)">${'★'.repeat(f.rating||0)}${'☆'.repeat(5-(f.rating||0))}</td>
+          <td style="font-size:11px;color:var(--dim)">${(f.tags||[]).join(', ') || '-'}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>`;
+}
+
+function renderGhosts() {
+  const ghosts = D.ghosts; const T = tr();
+  document.getElementById('content').innerHTML = `
+    <div class="insight-box">
+      <h4>${T.insights.ghTitle(ghosts.length)}</h4>
+      <p>${T.insights.ghBody(ghosts.length)}</p>
+    </div>
+    <div class="grid-2">
+      <div class="card stat"><div class="label">${T.stats.ghosts}</div><div class="val red">${ghosts.length}</div></div>
+      <div class="card stat"><div class="label">${T.stats.ofList}</div><div class="val red">${D.helse.ghosts_prosent}%</div></div>
+    </div>
+    <div class="card scrollable">
+      <h3>${T.insights.ghListTitle}</h3>
+      <table>
+        <thead><tr><th>${T.table.email}</th><th>${T.table.domain}</th><th>${T.table.opens}</th><th>${T.table.clicks}</th><th>${T.table.rating}</th></tr></thead>
+        <tbody>${ghosts.map(g => `<tr>
+          <td>${g.email}</td><td style="color:var(--dim)">${g.domene}</td>
+          <td>${rb(g.open_rate)}</td><td>${rb(g.click_rate)}</td>
+          <td style="color:var(--bc-yellow)">${'★'.repeat(g.rating||0)}${'☆'.repeat(5-(g.rating||0))}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>`;
+}
+
+function renderDomener() {
+  const { storste, beste, dode } = D.domener; const T = tr();
+  document.getElementById('content').innerHTML = `
+    <div class="insight-box">
+      <h4>${T.insights.domTitle}</h4>
+      <p>${T.insights.domBody}</p>
+    </div>
+    <div class="grid-2">
+      <div class="card scrollable">
+        <h3 style="color:var(--bc-green)">${T.insights.domBest}</h3>
+        <table><thead><tr><th>${T.table.domain}</th><th>${T.table.count}</th><th>${T.table.openRate}</th><th>${T.table.clickRate}</th></tr></thead>
+        <tbody>${beste.slice(0, 15).map(d => `<tr><td>${d.domene}</td><td>${d.antall}</td><td>${rb(d.snitt_open)}</td><td>${rb(d.snitt_click)}</td></tr>`).join('')}</tbody></table>
+      </div>
+      <div class="card scrollable">
+        <h3 style="color:var(--bc-red)">${T.insights.domDead}</h3>
+        <table><thead><tr><th>${T.table.domain}</th><th>${T.table.count}</th><th>${T.table.openRate}</th><th>${T.table.clickRate}</th></tr></thead>
+        <tbody>${dode.map(d => `<tr><td>${d.domene}</td><td>${d.antall}</td><td>${rb(d.snitt_open)}</td><td>${rb(d.snitt_click)}</td></tr>`).join('')}</tbody></table>
+      </div>
+    </div>
+    <div class="card" style="margin-top:20px"><h3>${T.charts.bigDomains}</h3><canvas id="domainChart"></canvas></div>`;
+  const top = storste.slice(0, 15);
+  charts.push(new Chart(document.getElementById('domainChart'), {
+    type: 'bar',
+    data: { labels: top.map(d => d.domene), datasets: [
+      { label: T.charts.count, data: top.map(d => d.antall), backgroundColor: BC.blue + '44', borderColor: BC.blue, borderWidth: 1, yAxisID: 'y' },
+      { label: T.charts.openRate, data: top.map(d => d.snitt_open), type: 'line', borderColor: BC.green, backgroundColor: 'transparent', yAxisID: 'y1', tension: .3, pointRadius: 4 },
+    ]},
+    options: { responsive: true, scales: { y: { beginAtZero: true, position: 'left', ticks: { color: '#666666' }, grid: { color: '#E0D8CC' } }, y1: { beginAtZero: true, position: 'right', ticks: { color: BC.green, callback: v => v + '%' }, grid: { display: false } }, x: { ticks: { color: '#666666', maxRotation: 45 }, grid: { display: false } } }, plugins: { legend: { labels: { color: '#666666' } } } }
+  }));
+}
+
+function renderTrend() {
+  const td = D.kampanje_trend; const T = tr();
+  document.getElementById('content').innerHTML = `
+    <div class="insight-box">
+      <h4>${T.insights.trendTitle}</h4>
+      <p>${T.insights.trendBody}</p>
+    </div>
+    <div class="card" style="margin-bottom:20px"><h3>${T.charts.openOverTime}</h3><canvas id="trendChart"></canvas></div>
+    <div class="card">
+      <table><thead><tr><th>${T.table.quarter}</th><th>${T.stats.campaigns}</th><th>${T.table.avgSent}</th><th>${T.table.openRate}</th><th>${T.table.clickRate}</th><th>${T.table.unsubs}</th></tr></thead>
+      <tbody>${td.map(q => `<tr><td><strong>${q.kvartal}</strong></td><td>${q.kampanjer}</td><td>${q.snitt_sendt}</td><td>${rb(q.snitt_open)}</td><td>${rb(q.snitt_click)}</td><td>${q.total_unsubs}</td></tr>`).join('')}</tbody></table>
+    </div>`;
+  charts.push(new Chart(document.getElementById('trendChart'), {
+    type: 'line',
+    data: { labels: td.map(q => q.kvartal), datasets: [
+      { label: T.charts.openRate, data: td.map(q => q.snitt_open), borderColor: BC.green, backgroundColor: BC.green + '18', fill: true, tension: .3 },
+      { label: T.charts.clickRate, data: td.map(q => q.snitt_click), borderColor: BC.yellow, backgroundColor: BC.yellow + '18', fill: true, tension: .3 },
+    ]},
+    options: chartOpts({ yTick: { callback: v => v + '%' } })
+  }));
+}
+
+function renderBestWorst() {
+  const T = tr();
+  document.getElementById('content').innerHTML = `
+    <div class="grid-2">
+      <div class="card scrollable">
+        <h3 style="color:var(--bc-green)">${T.insights.bestTitle}</h3>
+        <table><thead><tr><th>${T.table.subject}</th><th>${T.table.date}</th><th>${T.table.openRate}</th><th>${T.table.clickRate}</th></tr></thead>
+        <tbody>${D.beste_kampanjer.map(c => `<tr><td>${c.subject||'-'}</td><td style="white-space:nowrap">${fd(c.send_time)}</td><td>${rb(c.open_rate)}</td><td>${rb(c.click_rate)}</td></tr>`).join('')}</tbody></table>
+        <div class="hint">${T.insights.bestHint}</div>
+      </div>
+      <div class="card scrollable">
+        <h3 style="color:var(--bc-red)">${T.insights.worstTitle}</h3>
+        <table><thead><tr><th>${T.table.subject}</th><th>${T.table.date}</th><th>${T.table.openRate}</th><th>${T.table.clickRate}</th></tr></thead>
+        <tbody>${D.verste_kampanjer.map(c => `<tr><td>${c.subject||'-'}</td><td style="white-space:nowrap">${fd(c.send_time)}</td><td>${rb(c.open_rate)}</td><td>${rb(c.click_rate)}</td></tr>`).join('')}</tbody></table>
+        <div class="hint">${T.insights.worstHint}</div>
+      </div>
+    </div>`;
+}
+
+function renderTags() {
+  const tags = D.tags; const T = tr();
+  document.getElementById('content').innerHTML = `
+    <div class="insight-box">
+      <h4>${T.insights.tagTitle}</h4>
+      <p>${T.insights.tagBody}</p>
+    </div>
+    ${tags.length === 0 ? `<div class="card"><p style="color:var(--dim)">${T.insights.noTags}</p></div>` : `
+    <div class="grid-2">
+      <div class="card"><h3>${T.charts.tagEng}</h3><canvas id="tagChart"></canvas></div>
+      <div class="card scrollable">
+        <table><thead><tr><th>${T.table.tag}</th><th>${T.table.count}</th><th>${T.table.openRate}</th><th>${T.table.clickRate}</th></tr></thead>
+        <tbody>${tags.map(tg => `<tr><td><span class="badge seg" style="background:${BC.purple}22;color:${BC.purple}">${tg.tag}</span></td><td>${tg.antall}</td><td>${rb(tg.snitt_open)}</td><td>${rb(tg.snitt_click)}</td></tr>`).join('')}</tbody></table>
+      </div>
+    </div>`}`;
+  if (tags.length > 0) {
+    charts.push(new Chart(document.getElementById('tagChart'), {
+      type: 'bar',
+      data: { labels: tags.map(tg => tg.tag), datasets: [
+        { label: T.charts.openRate, data: tags.map(tg => tg.snitt_open), backgroundColor: BC.green + '44', borderColor: BC.green, borderWidth: 1 },
+        { label: T.charts.clickRate, data: tags.map(tg => tg.snitt_click), backgroundColor: BC.yellow + '44', borderColor: BC.yellow, borderWidth: 1 },
+      ]},
+      options: { indexAxis: 'y', responsive: true, scales: { x: { beginAtZero: true, ticks: { color: '#666666', callback: v => v + '%' }, grid: { color: '#E0D8CC' } }, y: { ticks: { color: '#666666' }, grid: { display: false } } }, plugins: { legend: { labels: { color: '#666666' } } } }
+    }));
+  }
+}
+
+load();
+</script>
+</body>
+</html>
